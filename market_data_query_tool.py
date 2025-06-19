@@ -25,37 +25,40 @@ df = pd.DataFrame(data)
 
 # Query parser
 def parse_query(query: str):
-    pattern = r"(?i)(?P<metric>CEO|KEY|TSB|Total|%)[^\\w]*Serviceable Market[^\\w]*(?:for)?[^\\w]*(?P<region>.+)"
-    match = re.search(pattern, query)
-    if not match:
-        return "Sorry, I couldn't understand your question."
-
+    query = query.lower()
     metric_map = {
-        "CEO": "CEO Serviceable Market",
-        "KEY": "KEY Serviceable Market",
-        "TSB": "TSB Serviceable Market",
-        "Total": "Total Serviceable Market",
-        "%": "% of Total"
+        "ceo": "CEO Serviceable Market",
+        "key": "KEY Serviceable Market",
+        "tsb": "TSB Serviceable Market",
+        "total": "Total Serviceable Market",
+        "%": "% of Total",
+        "percent": "% of Total",
+        "percentage": "% of Total"
     }
 
-    region = match.group("region").strip()
-    metric_key = match.group("metric").strip()
+    region_match = None
+    for region in df['Region']:
+        if region.lower() in query:
+            region_match = region
+            break
 
-    if metric_key not in metric_map:
-        return f"Metric '{metric_key}' not recognized."
-    metric_col = metric_map[metric_key]
+    metric_match = None
+    for keyword, column in metric_map.items():
+        if re.search(rf"\b{re.escape(keyword)}\b.*(available|serviceable)?\s*market", query):
+            metric_match = column
+            break
 
-    matched_rows = df[df['Region'].str.lower() == region.lower()]
-    if matched_rows.empty:
-        return f"Region '{region}' not found."
+    if not region_match:
+        return "Sorry, I couldn't recognize the region in your question."
+    if not metric_match:
+        return "Sorry, I couldn't recognize the market metric in your question."
 
-    value = matched_rows.iloc[0][metric_col]
-    return f"The {metric_col} for {matched_rows.iloc[0]['Region']} is {value}."
+    value = df.loc[df['Region'] == region_match, metric_match].values[0]
+    return f"The {metric_match} for {region_match} is {value}."
 
 # Streamlit interface
-user_query = st.text_input("Ask a market data question:", "What is the TSB Serviceable Market for Calgary Region?")
+user_query = st.text_input("Ask a market data question:", "What is the TSB Serviceable Available Market for Calgary Region?")
 
 if user_query:
     response = parse_query(user_query)
     st.write(response)
-
